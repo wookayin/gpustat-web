@@ -34,7 +34,7 @@ async def run_client(host, poll_delay=5.0, verbose=False):
                 print(f"[{host}] querying... ")
 
             try:
-                result = await conn.run('gpustat --color')
+                result = await conn.run('gpustat --color --gpuname-width 25')
             except GeneratorExit:
                 # interrupted
                 break
@@ -55,6 +55,9 @@ async def run_client(host, poll_delay=5.0, verbose=False):
 
 
 async def spawn_clients(hosts, verbose=False):
+    for host in hosts:
+        context.host_status[host] = None
+
     # launch all clients parallel
     await asyncio.gather(*[
         run_client(host, verbose=verbose) for host in hosts
@@ -73,16 +76,22 @@ ansi_conv = ansi2html.Ansi2HTMLConverter(dark_bg=True, scheme=scheme)
 async def handler(request):
     HEADER = '''
     <style>
+        body { overflow-x: scroll; }
         nav.header { font-family: monospace; margin-bottom: 10px; }
-        nav.header a, nav.header a:visited { color: #329af0; }
+        nav.header a, nav.header a:visited { color: #329af0; text-decoration: none; }
         nav.header a:hover { color: #a3daff; }
+
+        /* no line break */
+        pre.ansi2html-content { white-space: pre; }
     </style>
     <nav class="header">
         gpustat-web by <a href="https://github.com/wookayin" target="_blank">@wookayin</a>
+        <a href="javascript:clearTimeout(window.timer);" style="margin-left: 20px; color: #555555;"
+            onclick="this.style.display='none';">[do not refresh]</a>
     </nav>'''
 
     FOOTER = '''
-    <script>timer = setTimeout(function(){ window.location.reload(1); }, 5000);</script>
+    <script>window.timer = setTimeout(function(){ window.location.reload(1); }, 5000);</script>
     '''
 
     body = ''
