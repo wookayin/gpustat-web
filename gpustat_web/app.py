@@ -7,13 +7,13 @@ gpustat.web
 import asyncio
 import asyncssh
 import sys
+import traceback
 
 from datetime import datetime
-from copy import deepcopy
 from collections import OrderedDict
 
-from termcolor import cprint
-from aiohttp import web as web
+from termcolor import cprint, colored
+from aiohttp import web
 
 
 # the global context object
@@ -21,46 +21,59 @@ class Context(object):
     def __init__(self):
         self.host_status = OrderedDict()
 
+    def host_set_message(self, host, msg):
+        self.host_status[host] = colored(f"({host}) ", 'white') + msg + '\n'
+
+
 context = Context()
 
 
 # async handlers to collect gpu stats
-async def run_client(host, poll_delay=5.0, verbose=False):
-    async with asyncssh.connect(host) as conn:
-        print(f"[{host}] connection established!")
+async def run_client(host, poll_delay=5.0, name_length=None, verbose=False):
+    L = name_length or 0
 
-        while True:
-            if False: #verbose: XXX DEBUG
-                print(f"[{host}] querying... ")
+    try:
+        # establish a SSH connection.
+        async with asyncssh.connect(host) as conn:
+            print(f"[{host:<{L}}] connection established!")
 
-            try:
+            while True:
+                if False: #verbose: XXX DEBUG
+                    print(f"[{host:<{L}}] querying... ")
+
                 result = await conn.run('gpustat --color --gpuname-width 25')
-            except GeneratorExit:
-                # interrupted
-                break
 
-            now = datetime.now().strftime('%Y/%m/%d-%H:%M:%S.%f')
-            if result.exit_status != 0:
-                cprint(f"[{now} [{host}] error, exitcode={result.exit_status}", color='red')
-            else:
-                if verbose:
-                    cprint(f"[{now} [{host}] OK from gpustat ({len(result.stdout)} bytes)", color='cyan')
-                # update data
-                context.host_status[host] = result.stdout
+                now = datetime.now().strftime('%Y/%m/%d-%H:%M:%S.%f')
+                if result.exit_status != 0:
+                    cprint(f"[{now} [{host:<{L}}] error, exitcode={result.exit_status}", color='red')
+                else:
+                    if verbose:
+                        cprint(f"[{now} [{host:<{L}}] OK from gpustat ({len(result.stdout)} bytes)", color='cyan')
+                    # update data
+                    context.host_status[host] = result.stdout
 
-            # wait for a while...
-            await asyncio.sleep(poll_delay)
+                # wait for a while...
+                await asyncio.sleep(poll_delay)
 
-    print(f"[{host}] Bye!", color='yellow')
+    except asyncssh.misc.DisconnectError as ex:
+        # error?
+        context.host_set_message(host, colored(str(ex), 'red'))
+        traceback.print_exc()
+
+    finally:
+        cprint(f"[{host:<{L}}] Bye!", color='yellow')
 
 
 async def spawn_clients(hosts, verbose=False):
+    # initial response
     for host in hosts:
-        context.host_status[host] = None
+        context.host_set_message(host, "Loading ...")
+
+    name_length = max(len(host) for host in hosts)
 
     # launch all clients parallel
     await asyncio.gather(*[
-        run_client(host, verbose=verbose) for host in hosts
+        run_client(host, verbose=verbose, name_length=name_length) for host in hosts
     ])
 
 
@@ -82,12 +95,12 @@ async def handler(request):
         nav.header a:hover { color: #a3daff; }
 
         /* no line break */
-        pre.ansi2html-content { white-space: pre; }
+        pre.ansi2html-content { white-space: pre; word-wrap: normal; }
     </style>
     <nav class="header">
         gpustat-web by <a href="https://github.com/wookayin" target="_blank">@wookayin</a>
-        <a href="javascript:clearTimeout(window.timer);" style="margin-left: 20px; color: #555555;"
-            onclick="this.style.display='none';">[do not refresh]</a>
+        <a href="javascript:clearTimeout(window.timer);" style="margin-left: 20px; color: #666666;"
+            onclick="this.style.display='none';">[turn off auto-refresh]</a>
     </nav>'''
 
     FOOTER = '''
@@ -110,6 +123,7 @@ def create_app(loop, hosts=['localhost'], verbose=True):
 
     async def start_background_tasks(app):
         app.loop.create_task(spawn_clients(hosts, verbose=verbose))
+        await asyncio.sleep(0.1)
     app.on_startup.append(start_background_tasks)
 
     return app
