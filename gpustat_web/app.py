@@ -4,10 +4,12 @@ gpustat.web
 @author Jongwook Choi
 """
 
-import asyncio
-import asyncssh
 import sys
 import traceback
+
+import asyncio
+import asyncssh
+import aiohttp
 
 from datetime import datetime
 from collections import OrderedDict
@@ -16,8 +18,12 @@ from termcolor import cprint, colored
 from aiohttp import web
 
 
-# the global context object
+###############################################################################
+# Background workers to collect information from nodes
+###############################################################################
+
 class Context(object):
+    '''The global context object.'''
     def __init__(self):
         self.host_status = OrderedDict()
 
@@ -35,7 +41,7 @@ async def run_client(host, poll_delay=5.0, name_length=None, verbose=False):
     try:
         # establish a SSH connection.
         async with asyncssh.connect(host) as conn:
-            print(f"[{host:<{L}}] connection established!")
+            print(f"[{host:<{L}}] SSH connection established!")
 
             while True:
                 if False: #verbose: XXX DEBUG
@@ -77,7 +83,10 @@ async def spawn_clients(hosts, verbose=False):
     ])
 
 
+###############################################################################
 # webserver handlers.
+###############################################################################
+
 # monkey-patch ansi2html scheme. TODO: better color codes
 import ansi2html
 scheme = 'solarized'
@@ -86,8 +95,19 @@ ansi2html.style.SCHEME[scheme][0] = '#555555'
 ansi_conv = ansi2html.Ansi2HTMLConverter(dark_bg=True, scheme=scheme)
 
 
+def render_gpustat_body():
+    body = ''
+    for host, status in context.host_status.items():
+        if not status:
+            continue
+        body += status
+    return ansi_conv.convert(body, full=False)
+
+
 async def handler(request):
-    HEADER = '''
+    '''Renders the html page.'''
+
+    TEMPLATE = '''
     <style>
         body { overflow-x: scroll; }
         nav.header { font-family: monospace; margin-bottom: 10px; }
@@ -97,29 +117,81 @@ async def handler(request):
         /* no line break */
         pre.ansi2html-content { white-space: pre; word-wrap: normal; }
     </style>
-    <nav class="header">
+
+    %(ansi2html_headers)s
+
+    <body class="body_foreground body_background" style="font-size: normal;" >
+      <nav class="header">
         gpustat-web by <a href="https://github.com/wookayin" target="_blank">@wookayin</a>
         <a href="javascript:clearTimeout(window.timer);" style="margin-left: 20px; color: #666666;"
             onclick="this.style.display='none';">[turn off auto-refresh]</a>
-    </nav>'''
+      </nav>
+      <div id="gpustat">
+        <pre class="ansi2html-content" id="gpustat-content">
+        </pre>
+      </div>
+    </body>
 
-    FOOTER = '''
-    <script>window.timer = setTimeout(function(){ window.location.reload(1); }, 5000);</script>
-    '''
+    <script>
+        var ws = new WebSocket("ws://%(http_host)s/ws");
+        ws.onopen = function(e) {
+          console.log('Websocket connection established', ws);
+          ws.send('gpustat');
+        };
+        ws.onerror = function(error) {
+          console.log("onerror", error);
+        };
+        ws.onmessage = function(e) {
+          var msg = e.data;
+          console.log('Received data, length = ' + msg.length + ', ' + new Date().toString());
+          document.getElementById('gpustat-content').innerHTML = msg;
+        };
+        window.onbeforeunload = function() {
+          ws.close();  // close websocket client on exit
+        };
+        window.timer = setInterval( function() { ws.send('gpustat'); }, 5000);
+    </script>
+    ''' % dict(ansi2html_headers=ansi_conv.produce_headers().replace('\n', ' '),
+               http_host=request.host)
 
-    body = ''
-    for host, status in context.host_status.items():
-        if not status:
-            continue
-        body += status
-
-    body = HEADER + ansi_conv.convert(body) + FOOTER
+    body = TEMPLATE
     return web.Response(text=body, content_type='text/html')
 
+
+async def websocket_handler(request):
+    print("INFO: Websocket connection from {} established".format(request.remote))
+
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+
+    async def _handle_websocketmessage(msg):
+        if msg.data == 'close':
+            await ws.close()
+        else:
+            # send the rendered HTML body as a websocket message.
+            body = render_gpustat_body()
+            await ws.send_str(body)
+
+    async for msg in ws:
+        if msg.type == aiohttp.WSMsgType.CLOSE:
+            break
+        elif msg.type == aiohttp.WSMsgType.TEXT:
+            await _handle_websocketmessage(msg)
+        elif msg.type == aiohttp.WSMsgType.ERROR:
+            cprint("Websocket connection closed with exception %s" % ws.exception(), color='red')
+
+    print("INFO: Websocket connection from {} closed".format(request.remote))
+    return ws
+
+###############################################################################
+# app factory and entrypoint.
+###############################################################################
 
 def create_app(loop, hosts=['localhost'], verbose=True):
     app = web.Application()
     app.router.add_get('/', handler)
+    app.add_routes([web.get('/ws', websocket_handler)])
+
 
     async def start_background_tasks(app):
         app.loop.create_task(spawn_clients(hosts, verbose=verbose))
