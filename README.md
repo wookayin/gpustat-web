@@ -1,7 +1,14 @@
 gpustat-web
 ===========
 
-A web interface of [`gpustat`][gpustat] --- consolidate across your cluster.
+A web interface of [`gpustat`][gpustat] ---
+aggregate `gpustat` across multiple nodes.
+
+<p align="center">
+  <img src="screenshot.png" width="800" height="192" />
+</p>
+
+**NOTE**: This project is in alpha stage. Errors and exceptions are not well handled, and it might use much network resources. Please use at your own risk!
 
 
 Usage
@@ -14,6 +21,12 @@ Make sure ssh works under a proper authentication scheme such as publickey.
 python -m gpustat_web --port 48109 HOST1 [... HOSTN]
 ```
 
+Python 3.6+ is required.
+
+[gpustat]: https://github.com/wookayin/gpustat/
+
+
+
 ### More Examples
 
 To see CPU usage as well:
@@ -23,7 +36,9 @@ python -m gpustat_web --exec 'gpustat --color --gpuname-width 25; echo -en "CPU 
 ```
 
 
-Python 3.6+ is required.
+License
+-------
 
+MIT License
 
-[gpustat]: https://github.com/wookayin/gpustat/
+Copyright (c) 2018 Jongwook Choi
