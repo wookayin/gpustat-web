@@ -26,6 +26,7 @@ class Context(object):
     '''The global context object.'''
     def __init__(self):
         self.host_status = OrderedDict()
+        self.interval = 5.0
 
     def host_set_message(self, host, msg):
         self.host_status[host] = colored(f"({host}) ", 'white') + msg + '\n'
@@ -35,8 +36,10 @@ context = Context()
 
 
 # async handlers to collect gpu stats
-async def run_client(host, poll_delay=5.0, name_length=None, verbose=False):
+async def run_client(host, poll_delay=None, name_length=None, verbose=False):
     L = name_length or 0
+    if poll_delay is None:
+        poll_delay = context.interval
 
     try:
         # establish a SSH connection.
@@ -149,10 +152,11 @@ async def handler(request):
         window.onbeforeunload = function() {
           ws.close();  // close websocket client on exit
         };
-        window.timer = setInterval( function() { ws.send('gpustat'); }, 5000);
+        window.timer = setInterval( function() { ws.send('gpustat'); }, %(interval)d);
     </script>
     ''' % dict(ansi2html_headers=ansi_conv.produce_headers().replace('\n', ' '),
-               http_host=request.host)
+               http_host=request.host,
+               interval=int(context.interval * 1000))
 
     body = TEMPLATE
     return web.Response(text=body, content_type='text/html')
@@ -207,10 +211,14 @@ def main():
     parser.add_argument('hosts', nargs='*')
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--port', type=int, default=48109)
+    parser.add_argument('--interval', type=float, default=5.0)
     args = parser.parse_args()
 
     hosts = args.hosts or ['localhost']
     cprint(f"Hosts : {hosts}\n", color='green')
+
+    if args.interval > 0.1:
+        context.interval = args.interval
 
     loop = asyncio.get_event_loop()
     app = create_app(loop, hosts=hosts, verbose=args.verbose)
