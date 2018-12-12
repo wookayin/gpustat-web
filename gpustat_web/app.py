@@ -36,7 +36,7 @@ context = Context()
 
 
 # async handlers to collect gpu stats
-async def run_client(host, poll_delay=None, name_length=None, verbose=False):
+async def run_client(host, exec_cmd, poll_delay=None, name_length=None, verbose=False):
     L = name_length or 0
     if poll_delay is None:
         poll_delay = context.interval
@@ -50,7 +50,7 @@ async def run_client(host, poll_delay=None, name_length=None, verbose=False):
                 if False: #verbose: XXX DEBUG
                     print(f"[{host:<{L}}] querying... ")
 
-                result = await conn.run('gpustat --color --gpuname-width 25')
+                result = await conn.run(exec_cmd)
 
                 now = datetime.now().strftime('%Y/%m/%d-%H:%M:%S.%f')
                 if result.exit_status != 0:
@@ -73,7 +73,7 @@ async def run_client(host, poll_delay=None, name_length=None, verbose=False):
         cprint(f"[{host:<{L}}] Bye!", color='yellow')
 
 
-async def spawn_clients(hosts, verbose=False):
+async def spawn_clients(hosts, exec_cmd, verbose=False):
     # initial response
     for host in hosts:
         context.host_set_message(host, "Loading ...")
@@ -82,7 +82,7 @@ async def spawn_clients(hosts, verbose=False):
 
     # launch all clients parallel
     await asyncio.gather(*[
-        run_client(host, verbose=verbose, name_length=name_length) for host in hosts
+        run_client(host, exec_cmd, verbose=verbose, name_length=name_length) for host in hosts
     ])
 
 
@@ -191,14 +191,18 @@ async def websocket_handler(request):
 # app factory and entrypoint.
 ###############################################################################
 
-def create_app(loop, hosts=['localhost'], verbose=True):
+def create_app(loop, hosts=['localhost'], exec_cmd=None, verbose=True):
+    if not exec_cmd:
+        exec_cmd = 'gpustat --color'
+    if not exec_cmd.startswith('gpustat'):
+        raise ValueError("exec_cmd should start with gpustat!")
+
     app = web.Application()
     app.router.add_get('/', handler)
     app.add_routes([web.get('/ws', websocket_handler)])
 
-
     async def start_background_tasks(app):
-        app.loop.create_task(spawn_clients(hosts, verbose=verbose))
+        app.loop.create_task(spawn_clients(hosts, exec_cmd, verbose=verbose))
         await asyncio.sleep(0.1)
     app.on_startup.append(start_background_tasks)
 
@@ -212,16 +216,23 @@ def main():
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--port', type=int, default=48109)
     parser.add_argument('--interval', type=float, default=5.0)
+    parser.add_argument('--exec', type=str,
+                        default="gpustat --color --gpuname-width 25",
+                        help="command-line to execute (e.g. gpustat --color --gpuname-width 25)",
+                        )
     args = parser.parse_args()
 
     hosts = args.hosts or ['localhost']
-    cprint(f"Hosts : {hosts}\n", color='green')
+    cprint(f"Hosts : {hosts}", color='green')
+    cprint(f"Cmd   : {args.exec}", color='yellow')
 
     if args.interval > 0.1:
         context.interval = args.interval
 
     loop = asyncio.get_event_loop()
-    app = create_app(loop, hosts=hosts, verbose=args.verbose)
+    app = create_app(loop, hosts=hosts,
+                     exec_cmd=args.exec,
+                     verbose=args.verbose)
 
     try:
         # TODO: keyboardinterrupt handling
