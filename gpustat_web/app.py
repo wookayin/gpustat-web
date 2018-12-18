@@ -64,8 +64,9 @@ async def run_client(host, exec_cmd, poll_delay=None, name_length=None, verbose=
                 # wait for a while...
                 await asyncio.sleep(poll_delay)
 
-    except asyncssh.misc.DisconnectError as ex:
+    except (asyncssh.misc.DisconnectError, asyncssh.misc.ChannelOpenError) as ex:
         # error?
+        cprint("Disconnected : " + str(ex), color='red')
         context.host_set_message(host, colored(str(ex), 'red'))
         traceback.print_exc()
 
