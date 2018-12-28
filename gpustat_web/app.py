@@ -16,6 +16,10 @@ from collections import OrderedDict
 
 from termcolor import cprint, colored
 from aiohttp import web
+import aiohttp_jinja2 as aiojinja2
+
+import os
+__PATH__ = os.path.abspath(os.path.dirname(__file__))
 
 
 ###############################################################################
@@ -111,56 +115,14 @@ def render_gpustat_body():
 async def handler(request):
     '''Renders the html page.'''
 
-    TEMPLATE = '''
-    <style>
-        body { overflow-x: scroll; }
-        nav.header { font-family: monospace; margin-bottom: 10px; }
-        nav.header a, nav.header a:visited { color: #329af0; text-decoration: none; }
-        nav.header a:hover { color: #a3daff; }
-
-        /* no line break */
-        pre.ansi2html-content { white-space: pre; word-wrap: normal; }
-    </style>
-
-    %(ansi2html_headers)s
-
-    <body class="body_foreground body_background" style="font-size: normal;" >
-      <nav class="header">
-        gpustat-web by <a href="https://github.com/wookayin" target="_blank">@wookayin</a>
-        <a href="javascript:clearTimeout(window.timer);" style="margin-left: 20px; color: #666666;"
-            onclick="this.style.display='none';">[turn off auto-refresh]</a>
-      </nav>
-      <div id="gpustat">
-        <pre class="ansi2html-content" id="gpustat-content">
-        </pre>
-      </div>
-    </body>
-
-    <script>
-        var ws = new WebSocket("ws://%(http_host)s/ws");
-        ws.onopen = function(e) {
-          console.log('Websocket connection established', ws);
-          ws.send('gpustat');
-        };
-        ws.onerror = function(error) {
-          console.log("onerror", error);
-        };
-        ws.onmessage = function(e) {
-          var msg = e.data;
-          console.log('Received data, length = ' + msg.length + ', ' + new Date().toString());
-          document.getElementById('gpustat-content').innerHTML = msg;
-        };
-        window.onbeforeunload = function() {
-          ws.close();  // close websocket client on exit
-        };
-        window.timer = setInterval( function() { ws.send('gpustat'); }, %(interval)d);
-    </script>
-    ''' % dict(ansi2html_headers=ansi_conv.produce_headers().replace('\n', ' '),
-               http_host=request.host,
-               interval=int(context.interval * 1000))
-
-    body = TEMPLATE
-    return web.Response(text=body, content_type='text/html')
+    data = dict(
+        ansi2html_headers=ansi_conv.produce_headers().replace('\n', ' '),
+        http_host=request.host,
+        interval=int(context.interval * 1000)
+    )
+    response = aiojinja2.render_template('index.html', request, data)
+    response.headers['Content-Language'] = 'en'
+    return response
 
 
 async def websocket_handler(request):
@@ -207,6 +169,12 @@ def create_app(loop, hosts=['localhost'], exec_cmd=None, verbose=True):
         await asyncio.sleep(0.1)
     app.on_startup.append(start_background_tasks)
 
+    # jinja2 setup
+    import jinja2
+    aiojinja2.setup(app,
+                    loader=jinja2.FileSystemLoader(
+                        os.path.join(__PATH__, 'template'))
+                    )
     return app
 
 

@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+        body { overflow-x: scroll; }
+        nav.header { font-family: monospace; margin-bottom: 10px; }
+        nav.header a, nav.header a:visited { color: #329af0; text-decoration: none; }
+        nav.header a:hover { color: #a3daff; }
+
+        #gpustat { line-height: 0.95; }
+        pre.ansi2html-content { white-space: pre; word-wrap: normal; }  /* no line break */
+    </style>
+
+    {{ ansi2html_headers | safe }}
+  </head>
+
+  <body class="body_foreground body_background" style="font-size: normal;" >
+
+    <nav class="header">
+        gpustat-web by <a href="https://github.com/wookayin" target="_blank">@wookayin</a>
+        <a href="javascript:clearTimeout(window.timer);" style="margin-left: 20px; color: #666666;"
+            onclick="this.style.display='none';">[turn off auto-refresh]</a>
+    </nav>
+
+    <div id="gpustat">
+      <pre class="ansi2html-content" id="gpustat-content">
+      </pre>
+    </div>
+
+  </body>
+
+  <script>
+        var ws = new WebSocket("ws://{{http_host}}/ws");
+        ws.onopen = function(e) {
+          console.log('Websocket connection established', ws);
+          ws.send('gpustat');
+        };
+        ws.onerror = function(error) {
+          console.log("onerror", error);
+        };
+        ws.onmessage = function(e) {
+          var msg = e.data;
+          console.log('Received data, length = ' + msg.length + ', ' + new Date().toString());
+          document.getElementById('gpustat-content').innerHTML = msg;
+        };
+        window.onbeforeunload = function() {
+          ws.close();  // close websocket client on exit
+        };
+        window.timer = setInterval( function() { ws.send('gpustat'); }, {{ interval }});
+  </script>
+</html>
