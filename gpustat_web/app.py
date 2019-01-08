@@ -40,7 +40,8 @@ context = Context()
 
 
 # async handlers to collect gpu stats
-async def run_client(host, exec_cmd, poll_delay=None, name_length=None, verbose=False):
+async def run_client(host, exec_cmd, poll_delay=None, timeout=30.0,
+                     name_length=None, verbose=False):
     L = name_length or 0
     if poll_delay is None:
         poll_delay = context.interval
@@ -54,7 +55,7 @@ async def run_client(host, exec_cmd, poll_delay=None, name_length=None, verbose=
                 if False: #verbose: XXX DEBUG
                     print(f"[{host:<{L}}] querying... ")
 
-                result = await conn.run(exec_cmd)
+                result = await asyncio.wait_for(conn.run(exec_cmd), timeout=timeout)
 
                 now = datetime.now().strftime('%Y/%m/%d-%H:%M:%S.%f')
                 if result.exit_status != 0:
@@ -73,13 +74,17 @@ async def run_client(host, exec_cmd, poll_delay=None, name_length=None, verbose=
         try:
             # start SSH connection, or reconnect if it was disconnected
             await _loop_body()
-        except (asyncssh.misc.DisconnectError, asyncssh.misc.ChannelOpenError) as ex:
+
+        except (asyncio.TimeoutError) as ex:
+            cprint(f"Timeout after {timeout} sec: {host}", color='red')
+            context.host_set_message(host, colored('Timeout after {timeout} sec', 'red'))
+        except (asyncssh.misc.DisconnectError, asyncssh.misc.ChannelOpenError, OSError) as ex:
             # error or disconnected
-            cprint("Disconnected : " + str(ex), color='red')
+            cprint(f"Disconnected : {host}, {str(ex)}", color='red')
             context.host_set_message(host, colored(str(ex), 'red'))
             traceback.print_exc()
         finally:
-            cprint(f"[{host:<{L}}] Disconnected, trying in {poll_delay} sec...", color='yellow')
+            cprint(f"[{host:<{L}}] Disconnected, retrying in {poll_delay} sec...", color='yellow')
             await asyncio.sleep(poll_delay)
 
 
