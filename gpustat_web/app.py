@@ -59,6 +59,7 @@ async def run_client(host, exec_cmd, poll_delay=None, name_length=None, verbose=
                 now = datetime.now().strftime('%Y/%m/%d-%H:%M:%S.%f')
                 if result.exit_status != 0:
                     cprint(f"[{now} [{host:<{L}}] error, exitcode={result.exit_status}", color='red')
+                    context.host_set_message(host, colored(f'error, exitcode={result.exit_status}', 'red'))
                 else:
                     if verbose:
                         cprint(f"[{now} [{host:<{L}}] OK from gpustat ({len(result.stdout)} bytes)", color='cyan')
