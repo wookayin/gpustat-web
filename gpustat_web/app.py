@@ -45,7 +45,7 @@ async def run_client(host, exec_cmd, poll_delay=None, name_length=None, verbose=
     if poll_delay is None:
         poll_delay = context.interval
 
-    try:
+    async def _loop_body():
         # establish a SSH connection.
         async with asyncssh.connect(host) as conn:
             print(f"[{host:<{L}}] SSH connection established!")
@@ -68,14 +68,18 @@ async def run_client(host, exec_cmd, poll_delay=None, name_length=None, verbose=
                 # wait for a while...
                 await asyncio.sleep(poll_delay)
 
-    except (asyncssh.misc.DisconnectError, asyncssh.misc.ChannelOpenError) as ex:
-        # error?
-        cprint("Disconnected : " + str(ex), color='red')
-        context.host_set_message(host, colored(str(ex), 'red'))
-        traceback.print_exc()
-
-    finally:
-        cprint(f"[{host:<{L}}] Bye!", color='yellow')
+    while True:
+        try:
+            # start SSH connection, or reconnect if it was disconnected
+            await _loop_body()
+        except (asyncssh.misc.DisconnectError, asyncssh.misc.ChannelOpenError) as ex:
+            # error or disconnected
+            cprint("Disconnected : " + str(ex), color='red')
+            context.host_set_message(host, colored(str(ex), 'red'))
+            traceback.print_exc()
+        finally:
+            cprint(f"[{host:<{L}}] Disconnected, trying in {poll_delay} sec...", color='yellow')
+            await asyncio.sleep(poll_delay)
 
 
 async def spawn_clients(hosts, exec_cmd, verbose=False):
