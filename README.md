@@ -32,7 +32,7 @@ Python 3.6+ is required.
 To see CPU usage as well:
 
 ```
-python -m gpustat_web --exec 'gpustat --color --gpuname-width 25; echo -en "CPU : \033[0;31m"; cpu-usage | ascii-bar 27'
+python -m gpustat_web --exec 'gpustat --color --gpuname-width 25 && echo -en "CPU : \033[0;31m" && cpu-usage | ascii-bar 27'
 ```
 
 
@@ -41,4 +41,4 @@ License
 
 MIT License
 
-Copyright (c) 2018 Jongwook Choi
+Copyright (c) 2018-2019 Jongwook Choi
