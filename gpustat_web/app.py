@@ -49,7 +49,7 @@ async def run_client(host, exec_cmd, poll_delay=None, timeout=30.0,
     async def _loop_body():
         # establish a SSH connection.
         async with asyncssh.connect(host) as conn:
-            print(f"[{host:<{L}}] SSH connection established!")
+            cprint(f"[{host:<{L}}] SSH connection established!", attrs=['bold'])
 
             while True:
                 if False: #verbose: XXX DEBUG
@@ -75,17 +75,22 @@ async def run_client(host, exec_cmd, poll_delay=None, timeout=30.0,
             # start SSH connection, or reconnect if it was disconnected
             await _loop_body()
 
+        except asyncio.CancelledError:
+            cprint(f"[{host:<{L}}] Closed as being cancelled.", attrs=['bold'])
+            break
         except (asyncio.TimeoutError) as ex:
+            # timeout
             cprint(f"Timeout after {timeout} sec: {host}", color='red')
-            context.host_set_message(host, colored('Timeout after {timeout} sec', 'red'))
+            context.host_set_message(host, colored(f"Timeout after {timeout} sec", 'red'))
         except (asyncssh.misc.DisconnectError, asyncssh.misc.ChannelOpenError, OSError) as ex:
             # error or disconnected
             cprint(f"Disconnected : {host}, {str(ex)}", color='red')
             context.host_set_message(host, colored(str(ex), 'red'))
             traceback.print_exc()
-        finally:
-            cprint(f"[{host:<{L}}] Disconnected, retrying in {poll_delay} sec...", color='yellow')
-            await asyncio.sleep(poll_delay)
+
+        # retry upon timeout/disconnected, etc.
+        cprint(f"[{host:<{L}}] Disconnected, retrying in {poll_delay} sec...", color='yellow')
+        await asyncio.sleep(poll_delay)
 
 
 async def spawn_clients(hosts, exec_cmd, verbose=False):
@@ -175,9 +180,14 @@ def create_app(loop, hosts=['localhost'], exec_cmd=None, verbose=True):
     app.add_routes([web.get('/ws', websocket_handler)])
 
     async def start_background_tasks(app):
-        app.loop.create_task(spawn_clients(hosts, exec_cmd, verbose=verbose))
+        app._tasks = app.loop.create_task(spawn_clients(hosts, exec_cmd, verbose=verbose))
         await asyncio.sleep(0.1)
     app.on_startup.append(start_background_tasks)
+
+    async def shutdown_background_tasks(app):
+        cprint(f"... Terminating the application", color='yellow')
+        app._tasks.cancel()
+    app.on_shutdown.append(shutdown_background_tasks)
 
     # jinja2 setup
     import jinja2
@@ -213,12 +223,7 @@ def main():
                      exec_cmd=args.exec,
                      verbose=args.verbose)
 
-    try:
-        # TODO: keyboardinterrupt handling
-        web.run_app(app, host='0.0.0.0', port=args.port)
-    finally:
-        loop.close()
-
+    web.run_app(app, host='0.0.0.0', port=args.port)
 
 if __name__ == '__main__':
     main()
