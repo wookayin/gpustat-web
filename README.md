@@ -15,7 +15,9 @@ Usage
 -----
 
 Launch the application as follows. SSH connections will be established to each of the specified hosts.
-Make sure ssh works under a proper authentication scheme such as publickey.
+Make sure ssh works under a proper authentication scheme such as SSH key (e.g. `id-rsa`).
+It is known that asyncssh [does NOT obey](https://github.com/ronf/asyncssh/issues/108) `~/.ssh/config` file
+(e.g. alias, username, keyfile), so just be aware of this.
 
 ```
 python -m gpustat_web --port 48109 HOST1 [... HOSTN]
