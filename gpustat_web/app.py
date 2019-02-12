@@ -79,14 +79,19 @@ async def run_client(host, exec_cmd, poll_delay=None, timeout=30.0,
             cprint(f"[{host:<{L}}] Closed as being cancelled.", attrs=['bold'])
             break
         except (asyncio.TimeoutError) as ex:
-            # timeout
+            # timeout (retry)
             cprint(f"Timeout after {timeout} sec: {host}", color='red')
             context.host_set_message(host, colored(f"Timeout after {timeout} sec", 'red'))
         except (asyncssh.misc.DisconnectError, asyncssh.misc.ChannelOpenError, OSError) as ex:
-            # error or disconnected
+            # error or disconnected (retry)
             cprint(f"Disconnected : {host}, {str(ex)}", color='red')
             context.host_set_message(host, colored(str(ex), 'red'))
-            traceback.print_exc()
+        except Exception as e:
+            # A general exception unhandled, throw
+            cprint(f"[{host:<{L}}] {e}", color='red')
+            context.host_set_message(host, colored(f"{type(e).__name__}: {e}", 'red'))
+            cprint(traceback.format_exc())
+            raise
 
         # retry upon timeout/disconnected, etc.
         cprint(f"[{host:<{L}}] Disconnected, retrying in {poll_delay} sec...", color='yellow')
