@@ -177,8 +177,6 @@ async def websocket_handler(request):
 def create_app(loop, hosts=['localhost'], exec_cmd=None, verbose=True):
     if not exec_cmd:
         exec_cmd = 'gpustat --color'
-    if not exec_cmd.startswith('gpustat'):
-        raise ValueError("exec_cmd should start with gpustat!")
 
     app = web.Application()
     app.router.add_get('/', handler)

@@ -25,6 +25,8 @@ python -m gpustat_web --port 48109 HOST1 [... HOSTN]
 
 Python 3.6+ is required.
 
+Python 3.7+ is recommended because you may encounter issues about Openssl and cryptography with python 3.6.
+
 [gpustat]: https://github.com/wookayin/gpustat/
 
 
