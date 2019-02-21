@@ -1,6 +1,10 @@
 <!doctype html>
 <html>
   <head>
+    <meta charset="utf-8"></meta>
+    <script src="https://cdn.staticfile.org/jquery/2.1.1/jquery.min.js"></script>
+    <link href="https://cdn.staticfile.org/twitter-bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet">
+    <title>gpustat-web</title>
     <style>
         body { overflow-x: scroll; }
         nav.header { font-family: monospace; margin-bottom: 10px; }
@@ -8,13 +12,13 @@
         nav.header a:hover { color: #a3daff; }
 
         #gpustat { line-height: 0.95; }
-        pre.ansi2html-content { white-space: pre; word-wrap: normal; }  /* no line break */
+        pre.ansi2html-content {display:block; white-space: pre; word-wrap: normal; }  /* no line break */
     </style>
 
     {{ ansi2html_headers | safe }}
   </head>
 
-  <body class="body_foreground body_background" style="font-size: normal;" >
+  <body  style="font-size: normal;" >
 
     <nav class="header">
       <a href="https://github.com/wookayin/gpustat-web" target="_blank">gpustat-web</a>
@@ -23,10 +27,8 @@
          onclick="this.style.display='none';">[turn off auto-refresh]</a>
     </nav>
 
-    <div id="gpustat">
-      <pre class="ansi2html-content" id="gpustat-content">
-      </pre>
-    </div>
+    <div id="gpustat" class="col-md-12">
+   </div>
 
   </body>
 
@@ -41,8 +43,8 @@
         };
         ws.onmessage = function(e) {
           var msg = e.data;
-          console.log('Received data, length = ' + msg.length + ', ' + new Date().toString());
-          document.getElementById('gpustat-content').innerHTML = msg;
+          //console.log('Received data, length = ' + msg.length + ', ' + new Date().toString());
+          document.getElementById('gpustat').innerHTML = msg;
         };
         window.onbeforeunload = function() {
           ws.close();  // close websocket client on exit

@@ -117,10 +117,10 @@ async def spawn_clients(hosts, exec_cmd, verbose=False):
 
 # monkey-patch ansi2html scheme. TODO: better color codes
 import ansi2html
-scheme = 'solarized'
+scheme = 'ansi2html'
 ansi2html.style.SCHEME[scheme] = list(ansi2html.style.SCHEME[scheme])
-ansi2html.style.SCHEME[scheme][0] = '#555555'
-ansi_conv = ansi2html.Ansi2HTMLConverter(dark_bg=True, scheme=scheme)
+#ansi2html.style.SCHEME[scheme][0] = '#555555'
+ansi_conv = ansi2html.Ansi2HTMLConverter(dark_bg=False, scheme=scheme)
 
 
 def render_gpustat_body():
@@ -128,8 +128,8 @@ def render_gpustat_body():
     for host, status in context.host_status.items():
         if not status:
             continue
-        body += status
-    return ansi_conv.convert(body, full=False)
+        body +="<pre class='ansi2html-content body_foreground body_background'>"+ansi_conv.convert( status,full=False)+"</pre>"
+    return body
 
 
 async def handler(request):
