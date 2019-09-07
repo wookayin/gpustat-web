@@ -13,6 +13,7 @@ import aiohttp
 
 from datetime import datetime
 from collections import OrderedDict
+from getpass import getpass
 
 from termcolor import cprint, colored
 from aiohttp import web
@@ -212,9 +213,15 @@ def main():
                         default="gpustat --color --gpuname-width 25",
                         help="command-line to execute (e.g. gpustat --color --gpuname-width 25)",
                         )
-    parser.add_argument('--password', type=str, default=None)
     parser.add_argument('--username', type=str, default=None)
+    parser.add_argument('--password', action='store_true', 
+                        help="password for ssh authentication")
     args = parser.parse_args()
+
+    if args.password:
+        password = getpass()
+    else:
+        password = None
 
     hosts = args.hosts or ['localhost']
     cprint(f"Hosts : {hosts}", color='green')
@@ -226,7 +233,7 @@ def main():
     loop = asyncio.get_event_loop()
     app = create_app(loop, 
                      username=args.username,
-                     password=args.password,
+                     password=password,
                      hosts=hosts,
                      exec_cmd=args.exec,
                      verbose=args.verbose)
