@@ -14,7 +14,7 @@ install_requires = [
     'termcolor',
     'ansi2html',
     'asyncssh>=1.16.0',
-    'aiohttp>=3.0.0',
+    'aiohttp>=3.0.0,<4.0',
     'aiohttp_jinja2',
     'aiohttp-devtools>=0.8',
 
