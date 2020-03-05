@@ -13,6 +13,7 @@ import aiohttp
 
 from datetime import datetime
 from collections import OrderedDict
+from getpass import getpass
 
 from termcolor import cprint, colored
 from aiohttp import web
@@ -41,14 +42,14 @@ context = Context()
 
 # async handlers to collect gpu stats
 async def run_client(host, exec_cmd, poll_delay=None, timeout=30.0,
-                     name_length=None, verbose=False):
+                     name_length=None, verbose=False, username=None, password=None):
     L = name_length or 0
     if poll_delay is None:
         poll_delay = context.interval
 
     async def _loop_body():
         # establish a SSH connection.
-        async with asyncssh.connect(host) as conn:
+        async with asyncssh.connect(host, username=username, password=password) as conn:
             cprint(f"[{host:<{L}}] SSH connection established!", attrs=['bold'])
 
             while True:
@@ -98,7 +99,7 @@ async def run_client(host, exec_cmd, poll_delay=None, timeout=30.0,
         await asyncio.sleep(poll_delay)
 
 
-async def spawn_clients(hosts, exec_cmd, verbose=False):
+async def spawn_clients(hosts, exec_cmd, username, password, verbose=False):
     # initial response
     for host in hosts:
         context.host_set_message(host, "Loading ...")
@@ -107,7 +108,7 @@ async def spawn_clients(hosts, exec_cmd, verbose=False):
 
     # launch all clients parallel
     await asyncio.gather(*[
-        run_client(host, exec_cmd, verbose=verbose, name_length=name_length) for host in hosts
+        run_client(host, exec_cmd, verbose=verbose, name_length=name_length, username=username, password=password) for host in hosts
     ])
 
 
@@ -174,7 +175,7 @@ async def websocket_handler(request):
 # app factory and entrypoint.
 ###############################################################################
 
-def create_app(loop, hosts=['localhost'], exec_cmd=None, verbose=True):
+def create_app(loop, username, password, hosts=['localhost'], exec_cmd=None, verbose=True):
     if not exec_cmd:
         exec_cmd = 'gpustat --color'
 
@@ -183,7 +184,7 @@ def create_app(loop, hosts=['localhost'], exec_cmd=None, verbose=True):
     app.add_routes([web.get('/ws', websocket_handler)])
 
     async def start_background_tasks(app):
-        app._tasks = app.loop.create_task(spawn_clients(hosts, exec_cmd, verbose=verbose))
+        app._tasks = app.loop.create_task(spawn_clients(hosts, exec_cmd, username, password, verbose=verbose))
         await asyncio.sleep(0.1)
     app.on_startup.append(start_background_tasks)
 
@@ -212,7 +213,15 @@ def main():
                         default="gpustat --color --gpuname-width 25",
                         help="command-line to execute (e.g. gpustat --color --gpuname-width 25)",
                         )
+    parser.add_argument('--username', type=str, default=None)
+    parser.add_argument('--password', action='store_true', 
+                        help="password for ssh authentication")
     args = parser.parse_args()
+
+    if args.password:
+        password = getpass()
+    else:
+        password = None
 
     hosts = args.hosts or ['localhost']
     cprint(f"Hosts : {hosts}", color='green')
@@ -222,7 +231,10 @@ def main():
         context.interval = args.interval
 
     loop = asyncio.get_event_loop()
-    app = create_app(loop, hosts=hosts,
+    app = create_app(loop, 
+                     username=args.username,
+                     password=password,
+                     hosts=hosts,
                      exec_cmd=args.exec,
                      verbose=args.verbose)
 
