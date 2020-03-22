@@ -182,14 +182,16 @@ def create_app(loop, hosts=['localhost'], exec_cmd=None, verbose=True):
     app.router.add_get('/', handler)
     app.add_routes([web.get('/ws', websocket_handler)])
 
+    tasks = None
     async def start_background_tasks(app):
-        app._tasks = app.loop.create_task(spawn_clients(hosts, exec_cmd, verbose=verbose))
+        nonlocal tasks
+        tasks = loop.create_task(spawn_clients(hosts, exec_cmd, verbose=verbose))
         await asyncio.sleep(0.1)
     app.on_startup.append(start_background_tasks)
 
     async def shutdown_background_tasks(app):
         cprint(f"... Terminating the application", color='yellow')
-        app._tasks.cancel()
+        tasks.cancel()
     app.on_shutdown.append(shutdown_background_tasks)
 
     # jinja2 setup
