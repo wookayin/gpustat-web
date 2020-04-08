@@ -65,8 +65,10 @@ async def run_client(hostname: str, exec_cmd: str, *, port=22,
 
                 now = datetime.now().strftime('%Y/%m/%d-%H:%M:%S.%f')
                 if result.exit_status != 0:
-                    cprint(f"[{now} [{hostname:<{L}}] error, exitcode={result.exit_status}", color='red')
-                    context.host_set_message(hostname, colored(f'error, exitcode={result.exit_status}', 'red'))
+                    cprint(f"[{now} [{hostname:<{L}}] Error, exitcode={result.exit_status}", color='red')
+                    cprint(result.stderr or '', color='red')
+                    stderr_summary = (result.stderr or '').split('\n')[0]
+                    context.host_set_message(hostname, colored(f'[exitcode {result.exit_status}] {stderr_summary}', 'red'))
                 else:
                     if verbose:
                         cprint(f"[{now} [{hostname:<{L}}] OK from gpustat ({len(result.stdout)} bytes)", color='cyan')
