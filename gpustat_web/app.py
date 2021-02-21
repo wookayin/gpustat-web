@@ -161,6 +161,18 @@ def render_gpustat_body():
         body += status
     return ansi_conv.convert(body, full=False)
 
+def render_gpustat_body_json():
+    body = []
+    for host, status in context.host_status.items():
+        if not status:
+            continue
+        try:
+            parsed = json.loads(status)
+        except:
+            continue
+        body.append(parsed)
+    return json.dumps(body)
+
 
 async def handler(request):
     '''Renders the html page.'''
@@ -184,6 +196,10 @@ async def websocket_handler(request):
     async def _handle_websocketmessage(msg):
         if msg.data == 'close':
             await ws.close()
+        elif msg.data == 'json':
+            # send json formatted string as a websocket message.
+            body = render_gpustat_body_json()
+            await ws.send_str(body)
         else:
             # send the rendered HTML body as a websocket message.
             body = render_gpustat_body()
