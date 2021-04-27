@@ -28,6 +28,17 @@ Python 3.6+ is required.
 [gpustat]: https://github.com/wookayin/gpustat/
 
 
+### Running as a HTTP (SSL/TLS) server
+
+By default the web server will run as a HTTP server.
+If you want to run a secure SSL/TLS server over the HTTPS protocol, use `--ssl-certfile` and `--ssl-keyfile` option.
+You can use letsencrypt (`certbot`) to create a pair of SSL certificate and keyfile.
+
+Troubleshoothing: Verify SSL/TLS handshaking (if TLS connections cannot be established)
+```
+openssl s_client -showcerts -connect YOUR_HOST.com:PORT < /dev/null
+```
+
 
 ### More Examples
 
@@ -43,4 +54,4 @@ License
 
 MIT License
 
-Copyright (c) 2018-2020 Jongwook Choi
+Copyright (c) 2018-2021 Jongwook Choi
