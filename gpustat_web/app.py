@@ -41,14 +41,17 @@ class Context(object):
         self.host_status = OrderedDict()
         self.interval = 5.0
 
-    def host_set_message(self, hostname: str, msg: str):
-        self.host_status[hostname] = colored(f"({hostname}) ", 'white') + msg + '\n'
+    def host_set_message(self, hostname: str, port: str, msg: str):
+        self.host_status[f"{hostname}:{port}"] = colored(f"({hostname}) ", 'white') + msg + '\n'
+
+    def host_update_message(self, hostname: str, port: str, msg: str):
+        self.host_status[f"{hostname}:{port}"] = msg
 
 
 context = Context()
 
 
-async def run_client(hostname: str, exec_cmd: str, *, port=22,
+async def run_client(hostname: str, exec_cmd: str, *, username=None, port=22,
                      poll_delay=None, timeout=30.0,
                      name_length=None, verbose=False):
     '''An async handler to collect gpustat through a SSH channel.'''
@@ -58,7 +61,7 @@ async def run_client(hostname: str, exec_cmd: str, *, port=22,
 
     async def _loop_body():
         # establish a SSH connection.
-        async with asyncssh.connect(hostname, port=port) as conn:
+        async with asyncssh.connect(hostname, username=username, port=port) as conn:
             cprint(f"[{hostname:<{L}}] SSH connection established!", attrs=['bold'])
 
             while True:
@@ -72,12 +75,12 @@ async def run_client(hostname: str, exec_cmd: str, *, port=22,
                     cprint(f"[{now} [{hostname:<{L}}] Error, exitcode={result.exit_status}", color='red')
                     cprint(result.stderr or '', color='red')
                     stderr_summary = (result.stderr or '').split('\n')[0]
-                    context.host_set_message(hostname, colored(f'[exitcode {result.exit_status}] {stderr_summary}', 'red'))
+                    context.host_set_message(hostname, port, colored(f'[exitcode {result.exit_status}] {stderr_summary}', 'red'))
                 else:
                     if verbose:
                         cprint(f"[{now} [{hostname:<{L}}] OK from gpustat ({len(result.stdout)} bytes)", color='cyan')
                     # update data
-                    context.host_status[hostname] = result.stdout
+                    context.host_update_message(hostname, port, result.stdout)
 
                 # wait for a while...
                 await asyncio.sleep(poll_delay)
@@ -93,15 +96,15 @@ async def run_client(hostname: str, exec_cmd: str, *, port=22,
         except (asyncio.TimeoutError) as ex:
             # timeout (retry)
             cprint(f"Timeout after {timeout} sec: {hostname}", color='red')
-            context.host_set_message(hostname, colored(f"Timeout after {timeout} sec", 'red'))
+            context.host_set_message(hostname, port, colored(f"Timeout after {timeout} sec", 'red'))
         except (asyncssh.misc.DisconnectError, asyncssh.misc.ChannelOpenError, OSError) as ex:
             # error or disconnected (retry)
             cprint(f"Disconnected : {hostname}, {str(ex)}", color='red')
-            context.host_set_message(hostname, colored(str(ex), 'red'))
+            context.host_set_message(hostname, port, colored(str(ex), 'red'))
         except Exception as e:
             # A general exception unhandled, throw
             cprint(f"[{hostname:<{L}}] {e}", color='red')
-            context.host_set_message(hostname, colored(f"{type(e).__name__}: {e}", 'red'))
+            context.host_set_message(hostname, port, colored(f"{type(e).__name__}: {e}", 'red'))
             cprint(traceback.format_exc())
             raise
 
@@ -119,22 +122,22 @@ async def spawn_clients(hosts: List[str], exec_cmd: str, *,
         and returns (HOSTNAME, PORT)."""
         pr = urllib.parse.urlparse('ssh://{}/'.format(netloc))
         assert pr.hostname is not None, netloc
-        return (pr.hostname, pr.port)
+        return (pr.hostname, pr.username, pr.port if pr.port else default_port)
 
     try:
-        host_names, host_ports = zip(*(_parse_host_string(host) for host in hosts))
+        host_names, host_usernames, host_ports = zip(*(_parse_host_string(host) for host in hosts))
 
         # initial response
-        for hostname in host_names:
-            context.host_set_message(hostname, "Loading ...")
+        for hostname, port in zip(host_names, host_ports):
+            context.host_set_message(hostname, port, "Loading ...")
 
         name_length = max(len(hostname) for hostname in host_names)
 
         # launch all clients parallel
         await asyncio.gather(*[
-            run_client(hostname, exec_cmd, port=port or default_port,
+            run_client(hostname, exec_cmd, username=username, port=port or default_port,
                     verbose=verbose, name_length=name_length)
-            for (hostname, port) in zip(host_names, host_ports)
+            for (hostname, username, port) in zip(host_names, host_usernames, host_ports)
         ])
     except Exception as ex:
         # TODO: throw the exception outside and let aiohttp abort startup
