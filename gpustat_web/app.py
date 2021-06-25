@@ -49,6 +49,7 @@ context = Context()
 
 
 async def run_client(hostname: str, exec_cmd: str, *, port=22,
+                     ssh_kwargs={},
                      poll_delay=None, timeout=30.0,
                      name_length=None, verbose=False):
     '''An async handler to collect gpustat through a SSH channel.'''
@@ -58,7 +59,9 @@ async def run_client(hostname: str, exec_cmd: str, *, port=22,
 
     async def _loop_body():
         # establish a SSH connection.
-        async with asyncssh.connect(hostname, port=port) as conn:
+        # async with asyncssh.connect(hostname, port=port, username=username, password=password, passphrase=passphrase) as conn:
+        cprint(f'Trying to connect to {hostname}:{port} with params {ssh_kwargs}')
+        async with asyncssh.connect(hostname, port=port, **ssh_kwargs) as conn:
             cprint(f"[{hostname:<{L}}] SSH connection established!", attrs=['bold'])
 
             while True:
@@ -111,7 +114,11 @@ async def run_client(hostname: str, exec_cmd: str, *, port=22,
 
 
 async def spawn_clients(hosts: List[str], exec_cmd: str, *,
-                        default_port: int, verbose=False):
+                        default_port: int,
+                        username=None,
+                        password=None,
+                        passphrase=None,
+                        verbose=False):
     '''Create a set of async handlers, one per host.'''
 
     def _parse_host_string(netloc: str) -> Tuple[str, Optional[int]]:
@@ -124,6 +131,15 @@ async def spawn_clients(hosts: List[str], exec_cmd: str, *,
     try:
         host_names, host_ports = zip(*(_parse_host_string(host) for host in hosts))
 
+        # additional ssh information
+        ssh_kwargs = dict()
+        if username:
+            ssh_kwargs['username'] = username
+        if password:
+            ssh_kwargs['password'] = password
+        if passphrase:
+            ssh_kwargs['passphrase'] = passphrase
+
         # initial response
         for hostname in host_names:
             context.host_set_message(hostname, "Loading ...")
@@ -132,7 +148,7 @@ async def spawn_clients(hosts: List[str], exec_cmd: str, *,
 
         # launch all clients parallel
         await asyncio.gather(*[
-            run_client(hostname, exec_cmd, port=port or default_port,
+            run_client(hostname, exec_cmd, port=port, ssh_kwargs=ssh_kwargs,
                     verbose=verbose, name_length=name_length)
             for (hostname, port) in zip(host_names, host_ports)
         ])
@@ -208,6 +224,9 @@ async def websocket_handler(request):
 def create_app(loop, *,
                hosts=['localhost'],
                default_port: int = 22,
+               username: Optional[str] = None,
+               password: Optional[str] = None,
+               passphrase: Optional[str] = None,
                ssl_certfile: Optional[str] = None,
                ssl_keyfile: Optional[str] = None,
                exec_cmd: Optional[str] = None,
@@ -220,8 +239,13 @@ def create_app(loop, *,
     app.add_routes([web.get('/ws', websocket_handler)])
 
     async def start_background_tasks(app):
-        clients = spawn_clients(
-            hosts, exec_cmd, default_port=default_port, verbose=verbose)
+        clients = spawn_clients(hosts,
+                                exec_cmd,
+                                default_port=default_port,
+                                username=username,
+                                password=password,
+                                passphrase=passphrase,
+                                verbose=verbose)
         app['tasks'] = loop.create_task(clients)
         await asyncio.sleep(0.1)
     app.on_startup.append(start_background_tasks)
@@ -260,6 +284,12 @@ def main():
                         help="Port number the web application will listen to. (Default: 48109)")
     parser.add_argument('--ssh-port', type=int, default=22,
                         help="Default SSH port to establish connection through. (Default: 22)")
+    parser.add_argument('--username', type=str, default=None,
+                        help="Username for SSH.")
+    parser.add_argument('--password', type=str, default=None,
+                        help="Password for SSH.")
+    parser.add_argument('--passphrase', type=str, default=None,
+                        help="Passphrase for SSH.")
     parser.add_argument('--interval', type=float, default=5.0,
                         help="Interval (in seconds) between two consecutive requests.")
     parser.add_argument('--ssl-certfile', type=str, default=None,
@@ -280,7 +310,12 @@ def main():
 
     loop = asyncio.get_event_loop()
     app, ssl_context = create_app(
-        loop, hosts=hosts, default_port=args.ssh_port,
+        loop,
+        hosts=hosts,
+        default_port=args.ssh_port,
+        username=args.username,
+        password=args.password,
+        passphrase=args.passphrase,
         ssl_certfile=args.ssl_certfile, ssl_keyfile=args.ssl_keyfile,
         exec_cmd=args.exec,
         verbose=args.verbose)

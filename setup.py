@@ -17,7 +17,7 @@ install_requires = [
     'aiohttp>=3.0.0,<4.0',
     'aiohttp_jinja2',
     'aiohttp-devtools>=0.8',
-
+    'bcrypt',
 ]
 
 tests_requires = [
