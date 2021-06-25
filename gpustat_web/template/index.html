@@ -31,7 +31,8 @@
   </body>
 
   <script>
-        var ws = new WebSocket("ws://{{http_host}}/ws");
+        var ws_protocol = (location.protocol == 'https:' ? 'wss:' : 'ws:');
+        var ws = new WebSocket(ws_protocol + "//{{http_host}}/ws");
         ws.onopen = function(e) {
           console.log('Websocket connection established', ws);
           ws.send('gpustat');

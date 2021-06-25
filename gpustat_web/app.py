@@ -12,7 +12,9 @@ import os
 import sys
 import traceback
 import urllib
+
 import json
+import ssl
 
 import asyncio
 import asyncssh
@@ -222,8 +224,13 @@ async def websocket_handler(request):
 # app factory and entrypoint.
 ###############################################################################
 
-def create_app(loop, *, hosts=['localhost'], default_port=22,
-               exec_cmd=None, verbose=True):
+def create_app(loop, *,
+               hosts=['localhost'],
+               default_port: int = 22,
+               ssl_certfile: Optional[str] = None,
+               ssl_keyfile: Optional[str] = None,
+               exec_cmd: Optional[str] = None,
+               verbose=True):
     if not exec_cmd:
         exec_cmd = DEFAULT_GPUSTAT_COMMAND
 
@@ -249,7 +256,17 @@ def create_app(loop, *, hosts=['localhost'], default_port=22,
                     loader=jinja2.FileSystemLoader(
                         os.path.join(__PATH__, 'template'))
                     )
-    return app
+
+    # SSL setup
+    if ssl_certfile and ssl_keyfile:
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.load_cert_chain(certfile=ssl_certfile,
+                                    keyfile=ssl_keyfile)
+
+        cprint(f"Using Secure HTTPS (SSL/TLS) server ...", color='green')
+    else:
+        ssl_context = None   # type: ignore
+    return app, ssl_context
 
 
 def main():
@@ -264,6 +281,10 @@ def main():
                         help="Default SSH port to establish connection through. (Default: 22)")
     parser.add_argument('--interval', type=float, default=5.0,
                         help="Interval (in seconds) between two consecutive requests.")
+    parser.add_argument('--ssl-certfile', type=str, default=None,
+                        help="Path to the SSL certificate file (Optional, if want to run HTTPS server)")
+    parser.add_argument('--ssl-keyfile', type=str, default=None,
+                        help="Path to the SSL private key file (Optional, if want to run HTTPS server)")
     parser.add_argument('--exec', type=str,
                         default=DEFAULT_GPUSTAT_COMMAND,
                         help="command-line to execute (e.g. gpustat --color --gpuname-width 25)")
@@ -277,11 +298,14 @@ def main():
         context.interval = args.interval
 
     loop = asyncio.get_event_loop()
-    app = create_app(loop, hosts=hosts, default_port=args.ssh_port,
-                     exec_cmd=args.exec,
-                     verbose=args.verbose)
+    app, ssl_context = create_app(
+        loop, hosts=hosts, default_port=args.ssh_port,
+        ssl_certfile=args.ssl_certfile, ssl_keyfile=args.ssl_keyfile,
+        exec_cmd=args.exec,
+        verbose=args.verbose)
 
-    web.run_app(app, host='0.0.0.0', port=args.port)
+    web.run_app(app, host='0.0.0.0', port=args.port,
+                ssl_context=ssl_context)
 
 if __name__ == '__main__':
     main()
