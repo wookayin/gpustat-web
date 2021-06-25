@@ -169,9 +169,10 @@ def render_gpustat_body_json():
             continue
         try:
             parsed = json.loads(status)
-        except:
+            body.append(parsed)
+        except Exception as e:
+            cprint(f"Coudn't parse {host} message as json. {e}", color='yellow')
             continue
-        body.append(parsed)
     return json.dumps(body)
 
 
