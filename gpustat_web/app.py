@@ -13,6 +13,7 @@ import sys
 import traceback
 import urllib
 import ssl
+import getpass
 
 import asyncio
 import asyncssh
@@ -59,7 +60,7 @@ async def run_client(hostname: str, exec_cmd: str, *, port=22,
 
     async def _loop_body():
         # establish a SSH connection.
-        cprint(f'Trying to connect to {hostname}:{port} with params {ssh_kwargs}')
+        cprint(f'Trying to connect to {hostname}:{port}...')
         async with asyncssh.connect(hostname, port=port, **ssh_kwargs) as conn:
             cprint(f"[{hostname:<{L}}] SSH connection established!", attrs=['bold'])
 
@@ -285,10 +286,8 @@ def main():
                         help="Default SSH port to establish connection through. (Default: 22)")
     parser.add_argument('--username', type=str, default=None,
                         help="Username for SSH.")
-    parser.add_argument('--password', type=str, default=None,
-                        help="Password for SSH.")
-    parser.add_argument('--passphrase', type=str, default=None,
-                        help="Passphrase for SSH.")
+    parser.add_argument('--password', action='store_true', help="To ask the password for SSH.")
+    parser.add_argument('--passphrase', action='store_true', help="To ask the passphrase for SSH.")
     parser.add_argument('--interval', type=float, default=5.0,
                         help="Interval (in seconds) between two consecutive requests.")
     parser.add_argument('--ssl-certfile', type=str, default=None,
@@ -306,6 +305,11 @@ def main():
 
     if args.interval > 0.1:
         context.interval = args.interval
+
+    if args.password:
+        args.password = getpass.getpass('Enter password for ssh: ')
+    if args.passphrase:
+        args.passphrase = getpass.getpass('Enter passphrase for ssh: ')
 
     loop = asyncio.get_event_loop()
     app, ssl_context = create_app(
