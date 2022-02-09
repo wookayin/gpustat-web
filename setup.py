@@ -14,8 +14,9 @@ install_requires = [
     'termcolor',
     'ansi2html',
     'asyncssh>=1.16.0',
-    'aiohttp>=3.0.0,<4.0',
-    'aiohttp_jinja2',
+    'aiohttp>=3.6.3,<3.8',  # GH-19
+    'aiohttp_jinja2>=1.5',  # v1.5+ supports jinja2 v3.0
+    'jinja2>=3.0.0',
     'aiohttp-devtools>=0.8',
 
 ]
@@ -26,7 +27,7 @@ tests_requires = [
 
 setup(
     name='gpustat-web',
-    version='0.1.0',
+    version='0.1.1',
     license='MIT',
     description='A web interface of gpustat --- consolidate status across your cluster.',
     url='https://github.com/wookayin/gpustat-web',
