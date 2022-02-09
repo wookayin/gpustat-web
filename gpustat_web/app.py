@@ -205,7 +205,7 @@ async def websocket_handler(request):
 # app factory and entrypoint.
 ###############################################################################
 
-def create_app(loop, *,
+def create_app(*,
                hosts=['localhost'],
                default_port: int = 22,
                ssl_certfile: Optional[str] = None,
@@ -222,6 +222,8 @@ def create_app(loop, *,
     async def start_background_tasks(app):
         clients = spawn_clients(
             hosts, exec_cmd, default_port=default_port, verbose=verbose)
+        # See #19 for why we need to this against aiohttp 3.5, 3.8, and 4.0
+        loop = app.loop if hasattr(app, 'loop') else asyncio.get_event_loop()
         app['tasks'] = loop.create_task(clients)
         await asyncio.sleep(0.1)
     app.on_startup.append(start_background_tasks)
@@ -278,9 +280,8 @@ def main():
     if args.interval > 0.1:
         context.interval = args.interval
 
-    loop = asyncio.get_event_loop()
     app, ssl_context = create_app(
-        loop, hosts=hosts, default_port=args.ssh_port,
+        hosts=hosts, default_port=args.ssh_port,
         ssl_certfile=args.ssl_certfile, ssl_keyfile=args.ssl_keyfile,
         exec_cmd=args.exec,
         verbose=args.verbose)
