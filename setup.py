@@ -1,5 +1,7 @@
 """setup.py for gpustat-web."""
 
+# flake8: noqa
+
 from setuptools import setup
 import sys
 
@@ -25,9 +27,9 @@ tests_requires = [
 
 setup(
     name='gpustat-web',
-    version='0.2.0',
+    version='0.3.0.dev0',
     license='MIT',
-    description='A web interface of gpustat --- consolidate status across your cluster.',
+    description='A web interface of gpustat --- consolidate status across multiple nodes.',
     url='https://github.com/wookayin/gpustat-web',
     author='Jongwook Choi',
     author_email='wookayin@gmail.com',
