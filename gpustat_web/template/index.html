@@ -31,6 +31,16 @@
   </body>
 
   <script>
+        // On Load, fetch body with a simple ajax call
+        if(window.fetch) {
+          fetch('gpustat.html?full=0', {method: 'GET'}).then(function(response) {
+            return response.text();
+          }).then(function(html) {
+            document.getElementById('gpustat-content').innerHTML = html;
+          });
+        }
+
+        // Use websocket
         var ws_protocol = (location.protocol == 'https:' ? 'wss:' : 'ws:');
         var ws = new WebSocket(ws_protocol + "//{{http_host}}/ws");
         ws.onopen = function(e) {
