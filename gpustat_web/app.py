@@ -7,6 +7,7 @@ MIT License
 Copyright (c) 2018-2020 Jongwook Choi (@wookayin)
 """
 
+import re
 from typing import List, Tuple, Optional
 import os
 import sys
@@ -30,6 +31,7 @@ __PATH__ = os.path.abspath(os.path.dirname(__file__))
 
 DEFAULT_GPUSTAT_COMMAND = "gpustat --color --gpuname-width 25"
 
+RE_ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 ###############################################################################
 # Background workers to collect information from nodes
@@ -154,13 +156,25 @@ ansi2html.style.SCHEME[scheme][0] = '#555555'
 ansi_conv = ansi2html.Ansi2HTMLConverter(dark_bg=True, scheme=scheme)
 
 
-def render_gpustat_body():
+def render_gpustat_body(mode='html'):
+    # mode: Literal['html'] | Literal['html_full'] | Literal['ansi']
+
     body = ''
     for host, status in context.host_status.items():
         if not status:
             continue
         body += status
-    return ansi_conv.convert(body, full=False)
+
+    if mode == 'html':
+        return ansi_conv.convert(body, full=False)
+    elif mode == 'html_full':
+        return ansi_conv.convert(body, full=True)
+    elif mode == 'ansi':
+        return body
+    elif mode == 'plain':
+        return RE_ANSI.sub('', body)
+    else:
+        raise ValueError(mode)
 
 
 async def handler(request):
@@ -174,6 +188,22 @@ async def handler(request):
     response = aiojinja2.render_template('index.html', request, data)
     response.headers['Content-Language'] = 'en'
     return response
+
+
+def make_static_handler(content_type: str):
+
+    async def handler(request: web.Request):
+        full: bool = request.query.get('full', '1').lower() in ("yes", "true", "1")
+        content_type_ = content_type
+        if content_type == 'html' and full:
+            content_type_ = 'html_full'
+        body = render_gpustat_body(mode=content_type_)
+        response = web.Response(body=body)
+        response.headers['Content-Language'] = 'en'
+        response.headers['Content-Type'] = f'text/{content_type}; charset=utf-8'
+        return response
+
+    return handler
 
 
 async def websocket_handler(request):
@@ -218,6 +248,9 @@ def create_app(*,
     app = web.Application()
     app.router.add_get('/', handler)
     app.add_routes([web.get('/ws', websocket_handler)])
+    app.add_routes([web.get('/gpustat.html', make_static_handler('html'))])
+    app.add_routes([web.get('/gpustat.ansi', make_static_handler('ansi'))])
+    app.add_routes([web.get('/gpustat.txt', make_static_handler('plain'))])
 
     async def start_background_tasks(app):
         clients = spawn_clients(
