@@ -33,7 +33,8 @@
   <script>
         // On Load, fetch body with a simple ajax call
         if(window.fetch) {
-          fetch('gpustat.html?full=0', {method: 'GET'}).then(function(response) {
+          fetch('gpustat.html' + (location.search || '?') + '&full=0', {method: 'GET'}
+          ).then(function(response) {
             return response.text();
           }).then(function(html) {
             document.getElementById('gpustat-content').innerHTML = html;
@@ -43,9 +44,16 @@
         // Use websocket
         var ws_protocol = (location.protocol == 'https:' ? 'wss:' : 'ws:');
         var ws = new WebSocket(ws_protocol + "//{{http_host}}/ws");
+        var update = function() {
+          ws.send(JSON.stringify({
+            'message': 'query',
+            'nodes': new URLSearchParams(location.search).get('nodes'),
+          }));
+        };
+
         ws.onopen = function(e) {
           console.log('Websocket connection established', ws);
-          ws.send('gpustat');
+          update();
         };
         ws.onerror = function(error) {
           console.log("onerror", error);
@@ -58,6 +66,6 @@
         window.onbeforeunload = function() {
           ws.close();  // close websocket client on exit
         };
-        window.timer = setInterval( function() { ws.send('gpustat'); }, {{ interval }});
+        window.timer = setInterval( function() { update(); }, {{ interval }});
   </script>
 </html>
