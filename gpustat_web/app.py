@@ -156,7 +156,7 @@ ansi2html.style.SCHEME[scheme][0] = '#555555'
 ansi_conv = ansi2html.Ansi2HTMLConverter(dark_bg=True, scheme=scheme)
 
 
-def render_gpustat_body(mode='html'):
+def render_gpustat_body(mode='html', full_html=False):
     # mode: Literal['html'] | Literal['html_full'] | Literal['ansi']
 
     body = ''
@@ -166,9 +166,7 @@ def render_gpustat_body(mode='html'):
         body += status
 
     if mode == 'html':
-        return ansi_conv.convert(body, full=False)
-    elif mode == 'html_full':
-        return ansi_conv.convert(body, full=True)
+        return ansi_conv.convert(body, full=full_html)
     elif mode == 'ansi':
         return body
     elif mode == 'plain':
@@ -194,10 +192,7 @@ def make_static_handler(content_type: str):
 
     async def handler(request: web.Request):
         full: bool = request.query.get('full', '1').lower() in ("yes", "true", "1")
-        content_type_ = content_type
-        if content_type == 'html' and full:
-            content_type_ = 'html_full'
-        body = render_gpustat_body(mode=content_type_)
+        body = render_gpustat_body(mode=content_type, full_html=full)
         response = web.Response(body=body)
         response.headers['Content-Language'] = 'en'
         response.headers['Content-Type'] = f'text/{content_type}; charset=utf-8'
@@ -217,7 +212,7 @@ async def websocket_handler(request):
             await ws.close()
         else:
             # send the rendered HTML body as a websocket message.
-            body = render_gpustat_body()
+            body = render_gpustat_body(mode='html', full_html=False)
             await ws.send_str(body)
 
     async for msg in ws:

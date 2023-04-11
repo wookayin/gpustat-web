@@ -28,6 +28,14 @@ Python 3.6+ is required.
 [gpustat]: https://github.com/wookayin/gpustat/
 
 
+### Endpoints
+
+- `https://HOST:PORT/`: A webpage that updates automatically through websocket.
+- `https://HOST:PORT/gpustat.html`: Result as a static HTML page.
+- `https://HOST:PORT/gpustat.txt`: Result as a static plain text.
+- `https://HOST:PORT/gpustat.ansi`: Result as a static text with ANSI color codes. Try `curl https://.../gpustat.ansi`
+
+
 ### Running as a HTTP (SSL/TLS) server
 
 By default the web server will run as a HTTP server.
