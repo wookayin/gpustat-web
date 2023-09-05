@@ -1,9 +1,9 @@
-"""gpustat-web"""
+"""setup.py for gpustat-web."""
+
+# flake8: noqa
 
 from setuptools import setup
 import sys
-import os
-import re
 
 IS_PY_2 = (sys.version_info[0] <= 2)
 
@@ -14,8 +14,9 @@ install_requires = [
     'termcolor',
     'ansi2html',
     'asyncssh>=1.16.0',
-    'aiohttp>=3.0.0,<4.0',
-    'aiohttp_jinja2',
+    'aiohttp>=3.6.3',  # GH-19
+    'aiohttp_jinja2>=1.5',  # v1.5+ supports jinja2 v3.0
+    'jinja2>=3.0.0',
     'aiohttp-devtools>=0.8',
     'bcrypt',
 ]
@@ -26,9 +27,9 @@ tests_requires = [
 
 setup(
     name='gpustat-web',
-    version='0.1.0',
+    version='0.3.0.dev0',
     license='MIT',
-    description='A web interface of gpustat --- consolidate status across your cluster.',
+    description='A web interface of gpustat --- consolidate status across multiple nodes.',
     url='https://github.com/wookayin/gpustat-web',
     author='Jongwook Choi',
     author_email='wookayin@gmail.com',

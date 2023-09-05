@@ -8,6 +8,8 @@ Copyright (c) 2018-2020 Jongwook Choi (@wookayin)
 """
 
 from typing import List, Tuple, Optional
+import json
+import re
 import os
 import sys
 import traceback
@@ -31,6 +33,7 @@ __PATH__ = os.path.abspath(os.path.dirname(__file__))
 
 DEFAULT_GPUSTAT_COMMAND = "gpustat --color --gpuname-width 25"
 
+RE_ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 ###############################################################################
 # Background workers to collect information from nodes
@@ -170,13 +173,28 @@ ansi2html.style.SCHEME[scheme][0] = '#555555'
 ansi_conv = ansi2html.Ansi2HTMLConverter(dark_bg=True, scheme=scheme)
 
 
-def render_gpustat_body():
+def render_gpustat_body(
+    mode='html',   # mode: Literal['html'] | Literal['html_full'] | Literal['ansi']
+    *,
+    full_html: bool = False,
+    nodes: Optional[List[str]] = None,
+):
     body = ''
     for host, status in context.host_status.items():
         if not status:
             continue
+        if nodes is not None and host not in nodes:
+            continue
         body += status
-    return ansi_conv.convert(body, full=False)
+
+    if mode == 'html':
+        return ansi_conv.convert(body, full=full_html)
+    elif mode == 'ansi':
+        return body
+    elif mode == 'plain':
+        return RE_ANSI.sub('', body)
+    else:
+        raise ValueError(mode)
 
 
 async def handler(request):
@@ -192,6 +210,28 @@ async def handler(request):
     return response
 
 
+def _parse_querystring_list(value: Optional[str]) -> Optional[List[str]]:
+    return value.strip().split(',') if value else None
+
+
+def make_static_handler(content_type: str):
+
+    async def handler(request: web.Request):
+        # query string handling
+        full: bool = request.query.get('full', '1').lower() in ("yes", "true", "1")
+        nodes: Optional[List[str]] = _parse_querystring_list(request.query.get('nodes'))
+
+        body = render_gpustat_body(mode=content_type,
+                                   full_html=full,
+                                   nodes=nodes)
+        response = web.Response(body=body)
+        response.headers['Content-Language'] = 'en'
+        response.headers['Content-Type'] = f'text/{content_type}; charset=utf-8'
+        return response
+
+    return handler
+
+
 async def websocket_handler(request):
     print("INFO: Websocket connection from {} established".format(request.remote))
 
@@ -202,8 +242,15 @@ async def websocket_handler(request):
         if msg.data == 'close':
             await ws.close()
         else:
+            try:
+                payload = json.loads(msg.data)
+            except json.JSONDecodeError:
+                cprint(f"Malformed message from {request.remote}", color='yellow')
+                return
+
             # send the rendered HTML body as a websocket message.
-            body = render_gpustat_body()
+            nodes: Optional[List[str]] = _parse_querystring_list(payload.get('nodes'))
+            body = render_gpustat_body(mode='html', full_html=False, nodes=nodes)
             await ws.send_str(body)
 
     async for msg in ws:
@@ -221,7 +268,7 @@ async def websocket_handler(request):
 # app factory and entrypoint.
 ###############################################################################
 
-def create_app(loop, *,
+def create_app(*,
                hosts=['localhost'],
                default_port: int = 22,
                username: Optional[str] = None,
@@ -237,6 +284,9 @@ def create_app(loop, *,
     app = web.Application()
     app.router.add_get('/', handler)
     app.add_routes([web.get('/ws', websocket_handler)])
+    app.add_routes([web.get('/gpustat.html', make_static_handler('html'))])
+    app.add_routes([web.get('/gpustat.ansi', make_static_handler('ansi'))])
+    app.add_routes([web.get('/gpustat.txt', make_static_handler('plain'))])
 
     async def start_background_tasks(app):
         clients = spawn_clients(hosts,
@@ -246,6 +296,8 @@ def create_app(loop, *,
                                 password=password,
                                 passphrase=passphrase,
                                 verbose=verbose)
+        # See #19 for why we need to this against aiohttp 3.5, 3.8, and 4.0
+        loop = app.loop if hasattr(app, 'loop') else asyncio.get_event_loop()
         app['tasks'] = loop.create_task(clients)
         await asyncio.sleep(0.1)
     app.on_startup.append(start_background_tasks)
@@ -311,9 +363,8 @@ def main():
     if args.passphrase:
         args.passphrase = getpass.getpass('Enter passphrase for ssh: ')
 
-    loop = asyncio.get_event_loop()
+    # loop = asyncio.get_event_loop()
     app, ssl_context = create_app(
-        loop,
         hosts=hosts,
         default_port=args.ssh_port,
         username=args.username,
