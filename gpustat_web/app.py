@@ -14,6 +14,8 @@ import os
 import sys
 import traceback
 import urllib
+
+import json
 import ssl
 
 import asyncio
@@ -180,6 +182,19 @@ def render_gpustat_body(
     else:
         raise ValueError(mode)
 
+def render_gpustat_body_json():
+    body = []
+    for host, status in context.host_status.items():
+        if not status:
+            continue
+        try:
+            parsed = json.loads(status)
+            body.append(parsed)
+        except Exception as e:
+            cprint(f"Coudn't parse {host} message as json. {e}", color='yellow')
+            continue
+    return json.dumps(body)
+
 
 async def handler(request):
     '''Renders the html page.'''
@@ -225,6 +240,10 @@ async def websocket_handler(request):
     async def _handle_websocketmessage(msg):
         if msg.data == 'close':
             await ws.close()
+        elif msg.data == 'json':
+            # send json formatted string as a websocket message.
+            body = render_gpustat_body_json()
+            await ws.send_str(body)
         else:
             try:
                 payload = json.loads(msg.data)
