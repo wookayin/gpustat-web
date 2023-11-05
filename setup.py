@@ -50,6 +50,9 @@ setup(
         'Topic :: System :: Monitoring',
     ],
     packages=['gpustat_web'],
+    entry_points={
+        'console_scripts': ['gpustat-web=gpustat_web:main']
+    },
     install_requires=install_requires,
     extras_require={'test': tests_requires},
     setup_requires=['pytest-runner'],

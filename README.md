@@ -11,6 +11,15 @@ aggregate `gpustat` across multiple nodes.
 **NOTE**: This project is in alpha stage. Errors and exceptions are not well handled, and it might use much network resources. Please use at your own risk!
 
 
+Installation
+-----
+
+```
+pip install gpustat-web
+```
+
+Python 3.6+ is required.
+
 Usage
 -----
 
@@ -20,10 +29,9 @@ It is known that asyncssh [does NOT obey](https://github.com/ronf/asyncssh/issue
 (e.g. alias, username, keyfile), so just be aware of this.
 
 ```
-python -m gpustat_web --port 48109 HOST1 [... HOSTN]
+gpustat-web --port 48109 HOST1 [... HOSTN]
 ```
 
-Python 3.6+ is required.
 
 [gpustat]: https://github.com/wookayin/gpustat/
 
