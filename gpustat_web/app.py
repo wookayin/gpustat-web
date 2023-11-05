@@ -51,7 +51,8 @@ class Context(object):
 context = Context()
 
 
-async def run_client(hostname: str, exec_cmd: str, *, port=22,
+async def run_client(hostname: str, exec_cmd: str, *,
+                     port=22, verify_host: bool = True,
                      poll_delay=None, timeout=30.0,
                      name_length=None, verbose=False):
     '''An async handler to collect gpustat through a SSH channel.'''
@@ -61,7 +62,11 @@ async def run_client(hostname: str, exec_cmd: str, *, port=22,
 
     async def _loop_body():
         # establish a SSH connection.
-        async with asyncssh.connect(hostname, port=port) as conn:
+        # https://asyncssh.readthedocs.io/en/latest/api.html#asyncssh.SSHClientConnectionOptions
+        conn_kwargs = dict()
+        if not verify_host:
+            conn_kwargs['known_hosts'] = None  # Disable SSH host verification
+        async with asyncssh.connect(hostname, port=port, **conn_kwargs) as conn:
             cprint(f"[{hostname:<{L}}] SSH connection established!", attrs=['bold'])
 
             while True:
@@ -114,7 +119,8 @@ async def run_client(hostname: str, exec_cmd: str, *, port=22,
 
 
 async def spawn_clients(hosts: List[str], exec_cmd: str, *,
-                        default_port: int, verbose=False):
+                        default_port: int, verify_host: bool = True,
+                        verbose=False):
     '''Create a set of async handlers, one per host.'''
 
     def _parse_host_string(netloc: str) -> Tuple[str, Optional[int]]:
@@ -135,8 +141,12 @@ async def spawn_clients(hosts: List[str], exec_cmd: str, *,
 
         # launch all clients parallel
         await asyncio.gather(*[
-            run_client(hostname, exec_cmd, port=port or default_port,
-                    verbose=verbose, name_length=name_length)
+            run_client(
+                hostname, exec_cmd,
+                port=port or default_port,
+                verify_host=verify_host,
+                verbose=verbose, name_length=name_length
+            )
             for (hostname, port) in zip(host_names, host_ports)
         ])
     except Exception as ex:
@@ -255,6 +265,7 @@ async def websocket_handler(request):
 def create_app(*,
                hosts=['localhost'],
                default_port: int = 22,
+               verify_host: bool = True,
                ssl_certfile: Optional[str] = None,
                ssl_keyfile: Optional[str] = None,
                exec_cmd: Optional[str] = None,
@@ -271,7 +282,9 @@ def create_app(*,
 
     async def start_background_tasks(app):
         clients = spawn_clients(
-            hosts, exec_cmd, default_port=default_port, verbose=verbose)
+            hosts, exec_cmd, default_port=default_port,
+            verify_host=verify_host,
+            verbose=verbose)
         # See #19 for why we need to this against aiohttp 3.5, 3.8, and 4.0
         loop = app.loop if hasattr(app, 'loop') else asyncio.get_event_loop()
         app['tasks'] = loop.create_task(clients)
@@ -312,6 +325,8 @@ def main():
                         help="Port number the web application will listen to. (Default: 48109)")
     parser.add_argument('--ssh-port', type=int, default=22,
                         help="Default SSH port to establish connection through. (Default: 22)")
+    parser.add_argument('--no-verify-host', action='store_true',
+                        help="Skip SSH Host key verification. SSH host verification is turned on by default.")
     parser.add_argument('--interval', type=float, default=5.0,
                         help="Interval (in seconds) between two consecutive requests.")
     parser.add_argument('--ssl-certfile', type=str, default=None,
@@ -332,6 +347,7 @@ def main():
 
     app, ssl_context = create_app(
         hosts=hosts, default_port=args.ssh_port,
+        verify_host=not args.no_verify_host,
         ssl_certfile=args.ssl_certfile, ssl_keyfile=args.ssl_keyfile,
         exec_cmd=args.exec,
         verbose=args.verbose)

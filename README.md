@@ -23,14 +23,18 @@ Python 3.6+ is required.
 Usage
 -----
 
-Launch the application as follows. SSH connections will be established to each of the specified hosts.
-Make sure ssh works under a proper authentication scheme such as SSH key (e.g. `id-rsa`).
-It is known that asyncssh [does NOT obey](https://github.com/ronf/asyncssh/issues/108) `~/.ssh/config` file
-(e.g. alias, username, keyfile), so just be aware of this.
+Launch the application as follows. A SSH connection will be established to each of the specified hosts.
+Make sure `ssh <host>` works under a proper authentication scheme such as SSH authentication.
 
 ```
 gpustat-web --port 48109 HOST1 [... HOSTN]
 ```
+
+You might get "Host key is not trusted for `<host>`" errors. You'll have to accept and trust SSH keys of the host for the first time (it's stored in `~/.ssh/known_hosts`);
+try `ssh <host>` in the command line, or `ssh -oStrictHostKeyChecking=accept-new <host>` to automatically accept the host key. You can also use an option `gpustat-web --no-verify-host` to bypass SSH Host key validation (although not recommended).
+
+Note that asyncssh [does NOT obey](https://github.com/ronf/asyncssh/issues/108) the `~/.ssh/config` file
+(e.g. alias, username, keyfile), so any config in `~/.ssh/config` might not be picked up.
 
 
 [gpustat]: https://github.com/wookayin/gpustat/
@@ -74,4 +78,4 @@ License
 
 MIT License
 
-Copyright (c) 2018-2021 Jongwook Choi
+Copyright (c) 2018-2023 Jongwook Choi
