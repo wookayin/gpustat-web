@@ -7,13 +7,12 @@ MIT License
 Copyright (c) 2018-2020 Jongwook Choi (@wookayin)
 """
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 import json
 import re
 import os
-import sys
 import traceback
-import urllib
+import urllib.parse
 import ssl
 
 import asyncio
@@ -21,7 +20,7 @@ import asyncssh
 import aiohttp
 
 from datetime import datetime
-from collections import OrderedDict, Counter
+from collections import OrderedDict
 
 from termcolor import cprint, colored
 from aiohttp import web
@@ -60,6 +59,11 @@ async def run_client(hostname: str, exec_cmd: str, *,
     if poll_delay is None:
         poll_delay = context.interval
 
+    def _str(data: Union[bytes, str]) -> str:
+        if isinstance(data, bytes):
+            data = data.decode("utf-8")
+        return data
+
     async def _loop_body():
         # establish a SSH connection.
         # https://asyncssh.readthedocs.io/en/latest/api.html#asyncssh.SSHClientConnectionOptions
@@ -78,12 +82,13 @@ async def run_client(hostname: str, exec_cmd: str, *,
                 now = datetime.now().strftime('%Y/%m/%d-%H:%M:%S.%f')
                 if result.exit_status != 0:
                     cprint(f"[{now} [{hostname:<{L}}] Error, exitcode={result.exit_status}", color='red')
-                    cprint(result.stderr or '', color='red')
-                    stderr_summary = (result.stderr or '').split('\n')[0]
+                    cprint(_str(result.stderr or ''), color='red')
+                    stderr_summary = _str(result.stderr or '').split('\n')[0]
                     context.host_set_message(hostname, colored(f'[exitcode {result.exit_status}] {stderr_summary}', 'red'))
                 else:
                     if verbose:
-                        cprint(f"[{now} [{hostname:<{L}}] OK from gpustat ({len(result.stdout)} bytes)", color='cyan')
+                        cprint(f"[{now} [{hostname:<{L}}] OK from gpustat "
+                               f"({len(_str(result.stdout or ''))} bytes)", color='cyan')
                     # update data
                     context.host_status[hostname] = result.stdout
 
@@ -131,7 +136,9 @@ async def spawn_clients(hosts: List[str], exec_cmd: str, *,
         return (pr.hostname, pr.port)
 
     try:
-        host_names, host_ports = zip(*(_parse_host_string(host) for host in hosts))
+        host_names: List[str]
+        host_ports: List[int]
+        host_names, host_ports = zip(*(_parse_host_string(host) for host in hosts))  # type: ignore
 
         # initial response
         for hostname in host_names:
@@ -160,7 +167,7 @@ async def spawn_clients(hosts: List[str], exec_cmd: str, *,
 ###############################################################################
 
 # monkey-patch ansi2html scheme. TODO: better color codes
-import ansi2html
+import ansi2html.style
 scheme = 'solarized'
 ansi2html.style.SCHEME[scheme] = list(ansi2html.style.SCHEME[scheme])
 ansi2html.style.SCHEME[scheme][0] = '#555555'
