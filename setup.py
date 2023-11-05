@@ -30,7 +30,7 @@ def read_readme():
 
 setup(
     name='gpustat-web',
-    version='0.3.0.dev0',
+    version='0.3.0',
     license='MIT',
     description='A web interface of gpustat --- consolidate status across multiple nodes.',
     long_description=read_readme(),
