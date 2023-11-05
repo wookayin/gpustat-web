@@ -25,11 +25,18 @@ tests_requires = [
     'pytest',
 ]
 
+def read_readme():
+    with open('README.md', encoding='utf-8') as f:
+        return f.read()
+
+
 setup(
     name='gpustat-web',
     version='0.3.0.dev0',
     license='MIT',
     description='A web interface of gpustat --- consolidate status across multiple nodes.',
+    long_description=read_readme(),
+    long_description_content_type='text/markdown',
     url='https://github.com/wookayin/gpustat-web',
     author='Jongwook Choi',
     author_email='wookayin@gmail.com',
@@ -49,4 +56,5 @@ setup(
     tests_require=tests_requires,
     include_package_data=True,
     zip_safe=False,
+    python_requires='>=3.6',
 )
