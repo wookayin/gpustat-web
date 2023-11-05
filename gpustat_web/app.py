@@ -29,7 +29,7 @@ import aiohttp_jinja2 as aiojinja2
 
 __PATH__ = os.path.abspath(os.path.dirname(__file__))
 
-DEFAULT_GPUSTAT_COMMAND = "gpustat --color --gpuname-width 25"
+DEFAULT_GPUSTAT_COMMAND = "gpustat --color --gpuname-width 30 --show-power"
 
 RE_ANSI = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
