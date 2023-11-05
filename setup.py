@@ -5,8 +5,6 @@
 from setuptools import setup
 import sys
 
-IS_PY_2 = (sys.version_info[0] <= 2)
-
 
 install_requires = [
     #'gpustat>=0.5.0',
@@ -43,7 +41,7 @@ setup(
     keywords='nvidia-smi gpu cuda monitoring gpustat',
     classifiers=[
         # https://pypi.python.org/pypi?%3Aaction=list_classifiers
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'License :: OSI Approved :: MIT License',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Python :: 3',

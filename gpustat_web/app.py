@@ -4,7 +4,7 @@ gpustat.web
 
 MIT License
 
-Copyright (c) 2018-2020 Jongwook Choi (@wookayin)
+Copyright (c) 2018-2023 Jongwook Choi (@wookayin)
 """
 
 from typing import List, Tuple, Optional, Union
