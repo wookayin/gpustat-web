@@ -7,7 +7,6 @@ import sys
 
 
 install_requires = [
-    #'gpustat>=0.5.0',
     'six>=1.7',
     'termcolor',
     'ansi2html',
@@ -16,7 +15,6 @@ install_requires = [
     'aiohttp_jinja2>=1.5',  # v1.5+ supports jinja2 v3.0
     'jinja2>=3.0.0',
     'aiohttp-devtools>=0.8',
-
 ]
 
 tests_requires = [
