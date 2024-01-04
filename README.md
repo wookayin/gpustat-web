@@ -5,7 +5,7 @@ A web interface of [`gpustat`][gpustat] ---
 aggregate `gpustat` across multiple nodes.
 
 <p align="center">
-  <img src="screenshot.png" width="800" height="192" />
+  <img src="https://github.com/wookayin/gpustat-web/raw/master/screenshot.png" width="800" height="192" />
 </p>
 
 **NOTE**: This project is in alpha stage. Errors and exceptions are not well handled, and it might use much network resources. Please use at your own risk!
