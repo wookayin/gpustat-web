@@ -15,6 +15,7 @@ install_requires = [
     'aiohttp_jinja2>=1.5',  # v1.5+ supports jinja2 v3.0
     'jinja2>=3.0.0',
     'aiohttp-devtools>=0.8',
+    'packaging',
 ]
 
 tests_requires = [
