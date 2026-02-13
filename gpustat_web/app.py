@@ -53,7 +53,8 @@ context = Context()
 async def run_client(hostname: str, exec_cmd: str, *,
                      port=22, verify_host: bool = True,
                      poll_delay=None, timeout=30.0,
-                     name_length=None, verbose=False):
+                     name_length=None, verbose=False,
+                     username=None):
     '''An async handler to collect gpustat through a SSH channel.'''
     L = name_length or 0
     if poll_delay is None:
@@ -70,6 +71,8 @@ async def run_client(hostname: str, exec_cmd: str, *,
         conn_kwargs = dict()
         if not verify_host:
             conn_kwargs['known_hosts'] = None  # Disable SSH host verification
+        if username is not None:
+            conn_kwargs['username'] = username
         async with asyncssh.connect(hostname, port=port, **conn_kwargs) as conn:
             cprint(f"[{hostname:<{L}}] SSH connection established!", attrs=['bold'])
 
@@ -133,12 +136,12 @@ async def spawn_clients(hosts: List[str], exec_cmd: str, *,
         and returns (HOSTNAME, PORT)."""
         pr = urllib.parse.urlparse('ssh://{}/'.format(netloc))
         assert pr.hostname is not None, netloc
-        return (pr.hostname, pr.port)
+        return (pr.hostname, pr.port, pr.username)
 
     try:
         host_names: List[str]
         host_ports: List[int]
-        host_names, host_ports = zip(*(_parse_host_string(host) for host in hosts))  # type: ignore
+        host_names, host_ports, host_users = zip(*(_parse_host_string(host) for host in hosts))  # type: ignore
 
         # initial response
         for hostname in host_names:
@@ -152,9 +155,10 @@ async def spawn_clients(hosts: List[str], exec_cmd: str, *,
                 hostname, exec_cmd,
                 port=port or default_port,
                 verify_host=verify_host,
-                verbose=verbose, name_length=name_length
+                verbose=verbose, name_length=name_length,
+                username=user,
             )
-            for (hostname, port) in zip(host_names, host_ports)
+            for (hostname, port, user) in zip(host_names, host_ports, host_users)
         ])
     except Exception as ex:
         # TODO: throw the exception outside and let aiohttp abort startup

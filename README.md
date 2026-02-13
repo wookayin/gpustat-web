@@ -27,7 +27,7 @@ Launch the application as follows. A SSH connection will be established to each 
 Make sure `ssh <host>` works under a proper authentication scheme such as SSH authentication.
 
 ```
-gpustat-web --port 48109 HOST1 [... HOSTN]
+gpustat-web --port 48109 USER@HOST1 [... USER@HOSTN]
 ```
 
 You might get "Host key is not trusted for `<host>`" errors. You'll have to accept and trust SSH keys of the host for the first time (it's stored in `~/.ssh/known_hosts`);
