@@ -131,9 +131,9 @@ async def spawn_clients(hosts: List[str], exec_cmd: str, *,
                         verbose=False):
     '''Create a set of async handlers, one per host.'''
 
-    def _parse_host_string(netloc: str) -> Tuple[str, Optional[int]]:
-        """Parse a connection string (netloc) in the form of `HOSTNAME[:PORT]`
-        and returns (HOSTNAME, PORT)."""
+    def _parse_host_string(netloc: str) -> Tuple[str, Optional[int], Optional[str]]:
+        """Parse a connection string (netloc) in the form of `[USERNAME@]HOSTNAME[:PORT]`
+        and returns (HOSTNAME, PORT, USERNAME)."""
         pr = urllib.parse.urlparse('ssh://{}/'.format(netloc))
         assert pr.hostname is not None, netloc
         return (pr.hostname, pr.port, pr.username)
